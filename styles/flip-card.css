@@ -1,0 +1,31 @@
+@keyframes flipTop {
+  0% {
+    transform: rotateX(0deg);
+    z-index: 2;
+  }
+  100% {
+    transform: rotateX(-90deg);
+    z-index: 0;
+  }
+}
+
+@keyframes flipBottom {
+  0% {
+    transform: rotateX(90deg);
+    z-index: 0;
+  }
+  100% {
+    transform: rotateX(0deg);
+    z-index: 2;
+  }
+}
+
+@keyframes fadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes fadeOut {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
