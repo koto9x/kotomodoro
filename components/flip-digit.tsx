@@ -63,21 +63,29 @@ export function FlipDigit({ digit, unit, visible = true }: FlipDigitProps) {
 }
 
 /**
- * Renders a digit clipped to show only the top or bottom half.
- * The full digit is centered in a full-height container, then offset
- * so only the correct half is visible through overflow:hidden.
+ * A full-size digit that is clipped to show only the top or bottom half
+ * using clip-path: inset(). This is the only reliable cross-browser/mobile
+ * approach — it actually removes rendering of the clipped portion.
  */
-function HalfDigit({ char, half }: { char: string; half: 'top' | 'bottom' }) {
+function ClippedDigit({ char, half, className, style }: {
+  char: string;
+  half: 'top' | 'bottom';
+  className?: string;
+  style?: React.CSSProperties;
+}) {
   return (
     <div
-      className="absolute inset-0 flex items-center justify-center"
+      className={`absolute inset-0 ${className || ''}`}
       style={{
-        top: half === 'top' ? 0 : '-100%',
+        clipPath: half === 'top' ? 'inset(0 0 50% 0)' : 'inset(50% 0 0 0)',
+        ...style,
       }}
     >
-      <span className="text-4xl sm:text-5xl font-mono font-bold text-white select-none">
-        {char}
-      </span>
+      <div className="w-full h-full flex items-center justify-center">
+        <span className="text-4xl sm:text-5xl font-mono font-bold text-white select-none">
+          {char}
+        </span>
+      </div>
     </div>
   );
 }
@@ -89,57 +97,53 @@ function SingleDigit({ current, previous, isFlipping }: {
 }) {
   return (
     <div className="relative w-11 h-16 sm:w-14 sm:h-20" style={{ perspective: '800px' }}>
-      {/* === STATIC TOP HALF === shows current digit's top half */}
-      <div className="absolute inset-0 h-1/2 overflow-hidden bg-zinc-950 border border-b-0 border-zinc-800 rounded-t-md">
-        <HalfDigit char={current} half="top" />
-      </div>
+      {/* Static top half — current digit, clipped to top 50% */}
+      <ClippedDigit
+        char={current}
+        half="top"
+        className="bg-zinc-950 border border-zinc-800 rounded-md"
+      />
 
-      {/* === STATIC BOTTOM HALF === shows current digit's bottom half */}
-      <div className="absolute left-0 right-0 top-1/2 h-1/2 overflow-hidden bg-zinc-950 border border-t-0 border-zinc-800 rounded-b-md">
-        <HalfDigit char={current} half="bottom" />
-      </div>
+      {/* Static bottom half — current digit, clipped to bottom 50% */}
+      <ClippedDigit
+        char={current}
+        half="bottom"
+        className="bg-zinc-950 border border-zinc-800 rounded-md"
+      />
 
-      {/* === ANIMATED TOP FLAP === shows OLD digit, flips down to reveal new top */}
+      {/* Animated top flap — OLD digit flips down, revealing new digit behind */}
       {isFlipping && (
-        <div
-          className="absolute inset-0 h-1/2 overflow-hidden bg-zinc-950 border border-b-0 border-zinc-800 rounded-t-md z-10"
+        <ClippedDigit
+          char={previous}
+          half="top"
+          className="bg-zinc-950 border border-zinc-800 rounded-md z-10"
           style={{
-            transformOrigin: 'bottom center',
+            transformOrigin: 'center bottom',
             backfaceVisibility: 'hidden',
             willChange: 'transform',
             animation: 'flip-top 0.2s ease-in forwards',
           }}
-        >
-          <HalfDigit char={previous} half="top" />
-          <div
-            className="absolute inset-0 bg-black opacity-0"
-            style={{ animation: 'flip-shadow-in 0.2s linear forwards' }}
-          />
-        </div>
+        />
       )}
 
-      {/* === ANIMATED BOTTOM FLAP === reveals NEW digit bottom half */}
+      {/* Animated bottom flap — NEW digit unfolds from top */}
       {isFlipping && (
-        <div
-          className="absolute left-0 right-0 top-1/2 h-1/2 overflow-hidden bg-zinc-950 border border-t-0 border-zinc-800 rounded-b-md z-10"
+        <ClippedDigit
+          char={current}
+          half="bottom"
+          className="bg-zinc-950 border border-zinc-800 rounded-md z-10"
           style={{
-            transformOrigin: 'top center',
+            transformOrigin: 'center top',
             backfaceVisibility: 'hidden',
             willChange: 'transform',
-            animation: 'flip-bottom 0.2s ease-out 0.2s forwards',
             transform: 'rotateX(90deg)',
+            animation: 'flip-bottom 0.2s ease-out 0.2s forwards',
           }}
-        >
-          <HalfDigit char={current} half="bottom" />
-          <div
-            className="absolute inset-0 bg-black opacity-50"
-            style={{ animation: 'flip-shadow-out 0.2s linear 0.2s forwards' }}
-          />
-        </div>
+        />
       )}
 
-      {/* Divider line */}
-      <div className="absolute inset-x-0 top-1/2 h-px bg-zinc-700 z-20" />
+      {/* Divider line at the fold */}
+      <div className="absolute inset-x-0 top-1/2 h-px bg-zinc-700 z-20 pointer-events-none" />
     </div>
   );
 }

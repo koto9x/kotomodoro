@@ -29,13 +29,13 @@ export function TimerControls({
   onStopCountdown,
 }: TimerControlsProps) {
   return (
-    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 w-full max-w-md">
+    <div className="flex flex-col items-stretch gap-3 w-full">
       {isPomodoroMode ? (
         isRunning ? (
           <Button
             variant="secondary"
             className={cn(
-              "h-12 sm:h-10 text-base sm:text-sm",
+              "h-12 sm:h-10 text-base sm:text-sm w-full",
               pomodoroPhase === 'work' ? 'bg-red-500/10 hover:bg-red-500/20' : 'bg-green-500/10 hover:bg-green-500/20'
             )}
             onClick={onPause}
@@ -48,7 +48,7 @@ export function TimerControls({
             variant="secondary"
             onClick={onResume}
             className={cn(
-              "h-12 sm:h-10 text-base sm:text-sm",
+              "h-12 sm:h-10 text-base sm:text-sm w-full",
               pomodoroPhase === 'work' ? 'bg-red-500/10 hover:bg-red-500/20' : 'bg-green-500/10 hover:bg-green-500/20'
             )}
           >
@@ -59,7 +59,7 @@ export function TimerControls({
       ) : (
         <Button
           variant="outline"
-          className="h-12 sm:h-10 text-base sm:text-sm"
+          className="h-12 sm:h-10 text-base sm:text-sm w-full"
           onClick={onStartPomodoro}
         >
           <Timer className="w-4 h-4 mr-2" />
@@ -70,7 +70,7 @@ export function TimerControls({
       {isPomodoroMode && !isRunning && (
         <Button
           variant="outline"
-          className="h-12 sm:h-10 text-base sm:text-sm"
+          className="h-12 sm:h-10 text-base sm:text-sm w-full"
           onClick={onSkip}
         >
           <SkipForward className="w-4 h-4 mr-2" />
@@ -81,7 +81,7 @@ export function TimerControls({
       {isPomodoroMode && (
         <Button
           variant="outline"
-          className="text-destructive hover:text-destructive h-12 sm:h-10 text-base sm:text-sm"
+          className="text-destructive hover:text-destructive h-12 sm:h-10 text-base sm:text-sm w-full"
           onClick={onStop}
         >
           <Square className="w-4 h-4 mr-2" />
@@ -89,15 +89,14 @@ export function TimerControls({
         </Button>
       )}
 
-      {!isPomodoroMode && (
+      {!isPomodoroMode && isRunning && (
         <Button
           variant="secondary"
-          className="h-12 sm:h-10 text-base sm:text-sm"
+          className="h-12 sm:h-10 text-base sm:text-sm w-full"
           onClick={onStopCountdown}
-          disabled={!isRunning}
         >
           <Clock className="w-4 h-4 mr-2" />
-          {isRunning ? 'Stop Countdown' : 'Set Target Below'}
+          Stop Countdown
         </Button>
       )}
     </div>
