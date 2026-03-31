@@ -18,6 +18,7 @@ import { TimerDisplay } from './timer-display';
 import { TimerControls } from './timer-controls';
 import { PomodoroStatus } from './pomodoro-status';
 import { TargetTimePicker } from './target-time-picker';
+import { TargetTimeHeader } from './target-time-header';
 import { SettingsPanel } from './settings-panel';
 
 const CountdownTimer = () => {
@@ -190,10 +191,21 @@ const CountdownTimer = () => {
           />
         )}
 
-        {/* Current time above flip clock */}
-        <div className="text-sm font-mono text-zinc-500 tracking-wider">
-          {currentTime ? format(currentTime, displaySettings.use24HourTime ? 'HH:mm:ss' : 'hh:mm:ss a') : ''}
-        </div>
+        {/* Target time header (countdown mode only) */}
+        <TargetTimeHeader
+          targetDate={timer.targetDate}
+          isRunning={timer.isRunning}
+          isPomodoroMode={timer.isPomodoroMode}
+          urgencyLevel={timer.urgencyLevel}
+          use24HourTime={displaySettings.use24HourTime}
+        />
+
+        {/* Current time above flip clock (when no target time header showing) */}
+        {(timer.isPomodoroMode || !timer.isRunning || !timer.targetDate) && (
+          <div className="text-sm font-mono text-zinc-500 tracking-wider">
+            {currentTime ? format(currentTime, displaySettings.use24HourTime ? 'HH:mm:ss' : 'hh:mm:ss a') : ''}
+          </div>
+        )}
 
         {/* Flip clock display */}
         <TimerDisplay
