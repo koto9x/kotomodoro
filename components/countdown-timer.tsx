@@ -19,6 +19,7 @@ import { TimerControls } from './timer-controls';
 import { PomodoroStatus } from './pomodoro-status';
 import { TargetTimePicker } from './target-time-picker';
 import { TargetTimeHeader } from './target-time-header';
+import { UrgencyStatus } from './urgency-status';
 import { SettingsPanel } from './settings-panel';
 
 const CountdownTimer = () => {
@@ -191,7 +192,7 @@ const CountdownTimer = () => {
           />
         )}
 
-        {/* Target time header (countdown mode only) */}
+        {/* Target time (colored) above flip clock — minimal: just time + date */}
         <TargetTimeHeader
           targetDate={timer.targetDate}
           isRunning={timer.isRunning}
@@ -200,7 +201,7 @@ const CountdownTimer = () => {
           use24HourTime={displaySettings.use24HourTime}
         />
 
-        {/* Current time above flip clock (when no target time header showing) */}
+        {/* Current time above flip clock (when no target countdown active) */}
         {(timer.isPomodoroMode || !timer.isRunning || !timer.targetDate) && (
           <div className="text-sm font-mono text-zinc-500 tracking-wider">
             {currentTime ? format(currentTime, displaySettings.use24HourTime ? 'HH:mm:ss' : 'hh:mm:ss a') : ''}
@@ -243,6 +244,14 @@ const CountdownTimer = () => {
           targetDate={timer.targetDate}
           isPomodoroMode={timer.isPomodoroMode}
           onSetTargetTime={timer.setTargetTime}
+        />
+
+        {/* Urgency bar + label (between picker and bottom) */}
+        <UrgencyStatus
+          targetDate={timer.targetDate}
+          isRunning={timer.isRunning}
+          isPomodoroMode={timer.isPomodoroMode}
+          urgencyLevel={timer.urgencyLevel}
         />
       </div>
 

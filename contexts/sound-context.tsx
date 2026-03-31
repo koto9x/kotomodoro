@@ -4,12 +4,14 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { storage } from '@/lib/storage';
 
 export type SoundType = 'completion' | 'phaseChange' | 'warning' | 'start';
+export type VibrationPattern = 'gentle' | 'medium' | 'strong' | 'urgent';
 
 type SoundContextType = {
   soundEnabled: boolean;
   toggleSound: () => void;
   playSound: (type: SoundType) => void;
   playCompletionSound: () => void;
+  vibrate: (pattern: VibrationPattern) => void;
   requestNotificationPermission: () => Promise<boolean>;
   sendNotification: (title: string, body: string) => void;
 };
@@ -117,6 +119,21 @@ export function SoundProvider({ children }: { children: React.ReactNode }) {
     playSound('completion');
   }, [playSound]);
 
+  const vibrate = useCallback((pattern: VibrationPattern) => {
+    if (typeof navigator === 'undefined' || !navigator.vibrate) return;
+    const patterns: Record<VibrationPattern, number | number[]> = {
+      gentle: [50, 50, 50],           // two soft pulses
+      medium: [100, 50, 100, 50, 100], // three medium pulses
+      strong: [200, 100, 200, 100, 200, 100, 200], // four strong pulses
+      urgent: [300, 100, 300, 100, 300, 100, 300, 100, 300], // continuous heavy
+    };
+    try {
+      navigator.vibrate(patterns[pattern]);
+    } catch {
+      // vibrate may throw on some browsers
+    }
+  }, []);
+
   const requestNotificationPermission = useCallback(async (): Promise<boolean> => {
     if (typeof window === 'undefined' || !('Notification' in window)) return false;
     if (Notification.permission === 'granted') return true;
@@ -148,6 +165,7 @@ export function SoundProvider({ children }: { children: React.ReactNode }) {
       toggleSound,
       playSound,
       playCompletionSound,
+      vibrate,
       requestNotificationPermission,
       sendNotification,
     }}>

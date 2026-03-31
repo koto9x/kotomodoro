@@ -34,10 +34,12 @@ export interface UseTimerReturn {
 }
 
 export function useTimer(): UseTimerReturn {
-  const { playSound, sendNotification, requestNotificationPermission } = useSound();
+  const { playSound, vibrate, sendNotification, requestNotificationPermission } = useSound();
   const mounted = useRef(false);
   const remainingMsRef = useRef<number | null>(null);
   const warningSentRef = useRef(false);
+  const vibration10Ref = useRef(false);
+  const vibration5Ref = useRef(false);
 
   // Initialize from persisted storage
   const [targetDate, setTargetDate] = useState<Date | null>(null);
@@ -83,6 +85,8 @@ export function useTimer(): UseTimerReturn {
     setPomodoroPhase('work');
     setPomodoroCount(0);
     warningSentRef.current = false;
+    vibration10Ref.current = false;
+    vibration5Ref.current = false;
     const now = new Date();
     const newTarget = addMinutes(now, settings.pomodoroLength);
     setTargetDate(newTarget);
@@ -153,6 +157,9 @@ export function useTimer(): UseTimerReturn {
       setTimeLeft(getTimeUnits(timeLeftMs, false));
       setIsPomodoroMode(false);
       remainingMsRef.current = null;
+      warningSentRef.current = false;
+      vibration10Ref.current = false;
+      vibration5Ref.current = false;
       setIsRunning(true);
     }
   }, []);
@@ -216,9 +223,22 @@ export function useTimer(): UseTimerReturn {
 
       setTimeLeft(getTimeUnits(timeLeftMs, isPomodoroMode));
 
+      // 10-minute vibration
+      if (timeLeftMs <= 10 * 60 * 1000 && timeLeftMs > 9 * 60 * 1000 && !vibration10Ref.current) {
+        vibration10Ref.current = true;
+        vibrate('gentle');
+      }
+
+      // 5-minute vibration
+      if (timeLeftMs <= 5 * 60 * 1000 && timeLeftMs > 4 * 60 * 1000 && !vibration5Ref.current) {
+        vibration5Ref.current = true;
+        vibrate('medium');
+      }
+
       // 1-minute warning
       if (timeLeftMs <= 60 * 1000 && timeLeftMs > 59 * 1000 && !warningSentRef.current) {
         warningSentRef.current = true;
+        vibrate('strong');
         playSound('warning');
         if (isPomodoroMode) {
           const label = pomodoroPhase === 'work' ? 'Work session' : 'Break';
@@ -231,6 +251,9 @@ export function useTimer(): UseTimerReturn {
         setIsRunning(false);
         remainingMsRef.current = null;
         warningSentRef.current = false;
+        vibration10Ref.current = false;
+        vibration5Ref.current = false;
+        vibrate('urgent');
         playSound('completion');
 
         if (isPomodoroMode) {
@@ -283,7 +306,7 @@ export function useTimer(): UseTimerReturn {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [targetDate, isRunning, isPomodoroMode, pomodoroPhase, settings, pomodoroCount, currentTask, startBreak, startNextPomodoro, playSound, sendNotification, stopPomodoro]);
+  }, [targetDate, isRunning, isPomodoroMode, pomodoroPhase, settings, pomodoroCount, currentTask, startBreak, startNextPomodoro, playSound, vibrate, sendNotification, stopPomodoro]);
 
   return {
     timeLeft,
