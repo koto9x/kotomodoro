@@ -1,5 +1,6 @@
 'use client';
 
+import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { UrgencyLevel } from '@/lib/timer-types';
 
@@ -8,6 +9,7 @@ interface UrgencyStatusProps {
   isRunning: boolean;
   isPomodoroMode: boolean;
   urgencyLevel: UrgencyLevel;
+  use24HourTime: boolean;
 }
 
 const URGENCY_BAR_COLORS: Record<UrgencyLevel, string> = {
@@ -55,13 +57,19 @@ export function UrgencyStatus({
   isRunning,
   isPomodoroMode,
   urgencyLevel,
+  use24HourTime,
 }: UrgencyStatusProps) {
   if (isPomodoroMode || !isRunning || !targetDate) return null;
 
   const progress = getProgressPercent(targetDate);
+  const timeFormat = use24HourTime ? 'HH:mm' : 'h:mm a';
+  const formattedTarget = format(targetDate, timeFormat);
+  const isToday = new Date().toDateString() === targetDate.toDateString();
+  const formattedDate = isToday ? 'today' : format(targetDate, 'EEE, MMM d');
 
   return (
-    <div className="w-full space-y-1.5">
+    <div className="w-full space-y-1">
+      {/* Progress bar */}
       <div className={cn(
         "w-full h-1 rounded-full overflow-hidden transition-colors duration-1000",
         URGENCY_BAR_BG[urgencyLevel],
@@ -74,11 +82,24 @@ export function UrgencyStatus({
           style={{ width: `${progress}%` }}
         />
       </div>
-      <div className={cn(
-        "text-xs font-mono text-center transition-colors duration-1000",
-        URGENCY_TEXT_COLORS[urgencyLevel],
-      )}>
-        {URGENCY_LABELS[urgencyLevel]}
+
+      {/* Date (left) — label (center) — target time (right) */}
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-mono text-zinc-500">
+          {formattedDate}
+        </span>
+        <span className={cn(
+          "text-xs font-mono transition-colors duration-1000",
+          URGENCY_TEXT_COLORS[urgencyLevel],
+        )}>
+          {URGENCY_LABELS[urgencyLevel]}
+        </span>
+        <span className={cn(
+          "text-xs font-mono transition-colors duration-1000",
+          URGENCY_TEXT_COLORS[urgencyLevel],
+        )}>
+          {formattedTarget}
+        </span>
       </div>
     </div>
   );
