@@ -84,18 +84,18 @@ export function UrgencyStatus({
       </div>
 
       {/* Date (left) — label (center) — target time (right) */}
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-mono text-zinc-500">
+      <div className="flex items-center">
+        <span className="text-xs font-mono text-zinc-500 w-1/3 text-left truncate">
           {formattedDate}
         </span>
         <span className={cn(
-          "text-xs font-mono transition-colors duration-1000",
+          "text-xs font-mono w-1/3 text-center transition-colors duration-1000",
           URGENCY_TEXT_COLORS[urgencyLevel],
         )}>
           {URGENCY_LABELS[urgencyLevel]}
         </span>
         <span className={cn(
-          "text-xs font-mono transition-colors duration-1000",
+          "text-xs font-mono w-1/3 text-right transition-colors duration-1000",
           URGENCY_TEXT_COLORS[urgencyLevel],
         )}>
           {formattedTarget}

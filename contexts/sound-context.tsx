@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { storage } from '@/lib/storage';
 
 export type SoundType = 'completion' | 'phaseChange' | 'warning' | 'start';
@@ -17,15 +17,6 @@ type SoundContextType = {
 };
 
 const SoundContext = createContext<SoundContextType | undefined>(undefined);
-
-function getAudioContext(): AudioContext | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    return new (window.AudioContext || (window as any).webkitAudioContext)();
-  } catch {
-    return null;
-  }
-}
 
 // Synthesized sounds using Web Audio API
 function playTone(
@@ -52,45 +43,68 @@ function playTone(
   osc.stop(ctx.currentTime + duration);
 }
 
-const SOUNDS: Record<SoundType, (ctx: AudioContext) => void> = {
-  // Pleasant ascending three-note chime (C5-E5-G5)
-  completion: (ctx) => {
-    playTone(ctx, [{ freq: 523, time: 0 }], 0.3, 'sine', 0.12);
-    setTimeout(() => {
-      const ctx2 = getAudioContext();
-      if (ctx2) playTone(ctx2, [{ freq: 659, time: 0 }], 0.3, 'sine', 0.12);
-    }, 150);
-    setTimeout(() => {
-      const ctx3 = getAudioContext();
-      if (ctx3) playTone(ctx3, [{ freq: 784, time: 0 }], 0.5, 'sine', 0.15);
-    }, 300);
-  },
+function createSounds(ctx: AudioContext): Record<SoundType, () => void> {
+  return {
+    // Pleasant ascending three-note chime (C5-E5-G5)
+    completion: () => {
+      playTone(ctx, [{ freq: 523, time: 0 }], 0.3, 'sine', 0.12);
+      playTone(ctx, [{ freq: 659, time: 0.15 }], 0.3, 'sine', 0.12);
+      playTone(ctx, [{ freq: 784, time: 0.30 }], 0.5, 'sine', 0.15);
+    },
 
-  // Two-tone transition sound
-  phaseChange: (ctx) => {
-    playTone(ctx, [
-      { freq: 440, time: 0 },
-      { freq: 660, time: 0.15 },
-    ], 0.4, 'sine', 0.1);
-  },
+    // Two-tone transition sound
+    phaseChange: () => {
+      playTone(ctx, [
+        { freq: 440, time: 0 },
+        { freq: 660, time: 0.15 },
+      ], 0.4, 'sine', 0.1);
+    },
 
-  // Two quick alert pulses
-  warning: (ctx) => {
-    playTone(ctx, [{ freq: 880, time: 0 }], 0.15, 'triangle', 0.12);
-    setTimeout(() => {
-      const ctx2 = getAudioContext();
-      if (ctx2) playTone(ctx2, [{ freq: 880, time: 0 }], 0.15, 'triangle', 0.12);
-    }, 200);
-  },
+    // Two quick alert pulses
+    warning: () => {
+      playTone(ctx, [{ freq: 880, time: 0 }], 0.15, 'triangle', 0.12);
+      playTone(ctx, [{ freq: 880, time: 0.2 }], 0.15, 'triangle', 0.12);
+    },
 
-  // Soft confirmation click
-  start: (ctx) => {
-    playTone(ctx, [{ freq: 600, time: 0 }, { freq: 800, time: 0.05 }], 0.15, 'sine', 0.08);
-  },
-};
+    // Soft confirmation click
+    start: () => {
+      playTone(ctx, [{ freq: 600, time: 0 }, { freq: 800, time: 0.05 }], 0.15, 'sine', 0.08);
+    },
+  };
+}
 
 export function SoundProvider({ children }: { children: React.ReactNode }) {
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const soundsRef = useRef<Record<SoundType, () => void> | null>(null);
+
+  // Create a persistent AudioContext on first user interaction
+  useEffect(() => {
+    function initAudio() {
+      if (audioCtxRef.current) {
+        // Resume if suspended (iOS requirement)
+        if (audioCtxRef.current.state === 'suspended') {
+          audioCtxRef.current.resume();
+        }
+        return;
+      }
+      try {
+        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        audioCtxRef.current = ctx;
+        soundsRef.current = createSounds(ctx);
+      } catch {
+        // AudioContext not available
+      }
+    }
+
+    // Resume/init on any user gesture — required for iOS
+    const events = ['touchstart', 'touchend', 'click', 'keydown'];
+    events.forEach(e => document.addEventListener(e, initAudio, { once: false, passive: true }));
+
+    return () => {
+      events.forEach(e => document.removeEventListener(e, initAudio));
+    };
+  }, []);
 
   useEffect(() => {
     setSoundEnabled(storage.getSoundEnabled());
@@ -106,10 +120,16 @@ export function SoundProvider({ children }: { children: React.ReactNode }) {
 
   const playSound = useCallback((type: SoundType) => {
     if (!soundEnabled) return;
-    const ctx = getAudioContext();
+    const ctx = audioCtxRef.current;
     if (!ctx) return;
+    // Resume if suspended (can happen after iOS background)
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
     try {
-      SOUNDS[type](ctx);
+      if (soundsRef.current) {
+        soundsRef.current[type]();
+      }
     } catch (e) {
       console.error('Error playing sound:', e);
     }
@@ -122,10 +142,10 @@ export function SoundProvider({ children }: { children: React.ReactNode }) {
   const vibrate = useCallback((pattern: VibrationPattern) => {
     if (typeof navigator === 'undefined' || !navigator.vibrate) return;
     const patterns: Record<VibrationPattern, number | number[]> = {
-      gentle: [50, 50, 50],           // two soft pulses
-      medium: [100, 50, 100, 50, 100], // three medium pulses
-      strong: [200, 100, 200, 100, 200, 100, 200], // four strong pulses
-      urgent: [300, 100, 300, 100, 300, 100, 300, 100, 300], // continuous heavy
+      gentle: [50, 50, 50],
+      medium: [100, 50, 100, 50, 100],
+      strong: [200, 100, 200, 100, 200, 100, 200],
+      urgent: [300, 100, 300, 100, 300, 100, 300, 100, 300],
     };
     try {
       navigator.vibrate(patterns[pattern]);
@@ -145,7 +165,6 @@ export function SoundProvider({ children }: { children: React.ReactNode }) {
   const sendNotification = useCallback((title: string, body: string) => {
     if (typeof window === 'undefined' || !('Notification' in window)) return;
     if (Notification.permission !== 'granted') return;
-    // Only send when tab is not visible
     if (!document.hidden) return;
     try {
       new Notification(title, {

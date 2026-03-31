@@ -9,6 +9,12 @@ interface TimerDisplayProps {
 }
 
 export function TimerDisplay({ timeLeft, showSeconds }: TimerDisplayProps) {
+  const visibleUnits = timeLeft.filter(
+    (unit) => (unit.label !== 'seconds' || showSeconds) && unit.show
+  );
+  // Scale down when 4+ unit groups visible (days + hours + minutes + seconds)
+  const compact = visibleUnits.length >= 4;
+
   return (
     <div className="flex flex-col items-center justify-center mb-4">
       <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
@@ -18,6 +24,7 @@ export function TimerDisplay({ timeLeft, showSeconds }: TimerDisplayProps) {
             digit={unit.value}
             unit={unit.label}
             visible={(unit.label !== 'seconds' || showSeconds) && unit.show}
+            compact={compact}
           />
         ))}
       </div>

@@ -1,14 +1,16 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import { cn } from '@/lib/utils';
 
 interface FlipDigitProps {
   digit: number;
   unit: string;
   visible?: boolean;
+  compact?: boolean;
 }
 
-export function FlipDigit({ digit, unit, visible = true }: FlipDigitProps) {
+export function FlipDigit({ digit, unit, visible = true, compact = false }: FlipDigitProps) {
   const [displayDigit, setDisplayDigit] = useState(digit);
   const [prevDisplayDigit, setPrevDisplayDigit] = useState(digit);
   const [isFlipping, setIsFlipping] = useState(false);
@@ -21,9 +23,7 @@ export function FlipDigit({ digit, unit, visible = true }: FlipDigitProps) {
       setDisplayDigit(digit);
       prevDigitRef.current = digit;
 
-      // Reset flip animation
       setIsFlipping(false);
-      // Force a reflow so React re-mounts the animated elements
       requestAnimationFrame(() => {
         setIsFlipping(true);
 
@@ -46,52 +46,60 @@ export function FlipDigit({ digit, unit, visible = true }: FlipDigitProps) {
 
   return (
     <div className="flex flex-col items-center">
-      <div className="flex gap-1">
+      <div className="flex gap-0.5 sm:gap-1">
         <SingleDigit
           current={formattedCurrent[0]}
           previous={formattedPrevious[0]}
           isFlipping={isFlipping && formattedCurrent[0] !== formattedPrevious[0]}
+          compact={compact}
         />
         <SingleDigit
           current={formattedCurrent[1]}
           previous={formattedPrevious[1]}
           isFlipping={isFlipping && formattedCurrent[1] !== formattedPrevious[1]}
+          compact={compact}
         />
       </div>
-      <span className="mt-2 text-xs font-mono uppercase tracking-wider text-zinc-400">
+      <span className={cn(
+        "font-mono uppercase tracking-wider text-zinc-400",
+        compact ? "mt-1 text-[10px]" : "mt-2 text-xs",
+      )}>
         {unit}
       </span>
     </div>
   );
 }
 
-/**
- * A full-card-sized digit centered with flexbox, clipped to half via clip-path.
- * clip-path is on the OUTER wrapper, 3D transform on inner div.
- */
-function DigitFace({ char }: { char: string }) {
+function DigitFace({ char, compact }: { char: string; compact: boolean }) {
   return (
     <div className="w-full h-full flex items-center justify-center">
-      <span className="text-4xl sm:text-5xl font-mono font-bold text-white select-none">
+      <span className={cn(
+        "font-mono font-bold text-white select-none",
+        compact ? "text-2xl sm:text-4xl" : "text-4xl sm:text-5xl",
+      )}>
         {char}
       </span>
     </div>
   );
 }
 
-function SingleDigit({ current, previous, isFlipping }: {
+function SingleDigit({ current, previous, isFlipping, compact }: {
   current: string;
   previous: string;
   isFlipping: boolean;
+  compact: boolean;
 }) {
   return (
-    <div className="relative w-11 h-16 sm:w-14 sm:h-20">
+    <div className={cn(
+      "relative",
+      compact ? "w-8 h-12 sm:w-12 sm:h-16" : "w-11 h-16 sm:w-14 sm:h-20",
+    )}>
       {/* Static top half: current digit */}
       <div
         className="absolute inset-0 bg-zinc-950 border border-zinc-800 rounded-md overflow-hidden"
         style={{ clipPath: 'inset(0 0 50% 0)' }}
       >
-        <DigitFace char={current} />
+        <DigitFace char={current} compact={compact} />
       </div>
 
       {/* Static bottom half: shows OLD digit during flip, NEW digit after */}
@@ -99,7 +107,7 @@ function SingleDigit({ current, previous, isFlipping }: {
         className="absolute inset-0 bg-zinc-950 border border-zinc-800 rounded-md overflow-hidden"
         style={{ clipPath: 'inset(50% 0 0 0)' }}
       >
-        <DigitFace char={isFlipping ? previous : current} />
+        <DigitFace char={isFlipping ? previous : current} compact={compact} />
       </div>
 
       {/* Animated top flap: old digit folds down */}
@@ -115,7 +123,7 @@ function SingleDigit({ current, previous, isFlipping }: {
               animation: 'flip-top 0.3s ease-in forwards',
             }}
           >
-            <DigitFace char={previous} />
+            <DigitFace char={previous} compact={compact} />
             <div
               className="absolute inset-0 bg-black opacity-0"
               style={{ animation: 'flip-shadow-in 0.3s linear forwards' }}
@@ -138,7 +146,7 @@ function SingleDigit({ current, previous, isFlipping }: {
               animation: 'flip-bottom 0.3s ease-out 0.3s forwards',
             }}
           >
-            <DigitFace char={current} />
+            <DigitFace char={current} compact={compact} />
             <div
               className="absolute inset-0 bg-black opacity-50"
               style={{ animation: 'flip-shadow-out 0.3s linear 0.3s forwards' }}

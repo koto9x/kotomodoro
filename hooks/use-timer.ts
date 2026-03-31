@@ -223,16 +223,24 @@ export function useTimer(): UseTimerReturn {
 
       setTimeLeft(getTimeUnits(timeLeftMs, isPomodoroMode));
 
-      // 10-minute vibration
+      // 10-minute warning
       if (timeLeftMs <= 10 * 60 * 1000 && timeLeftMs > 9 * 60 * 1000 && !vibration10Ref.current) {
         vibration10Ref.current = true;
         vibrate('gentle');
+        if (!isPomodoroMode) {
+          playSound('warning');
+          sendNotification('Kotomodoro', 'Target time in 10 minutes');
+        }
       }
 
-      // 5-minute vibration
+      // 5-minute warning
       if (timeLeftMs <= 5 * 60 * 1000 && timeLeftMs > 4 * 60 * 1000 && !vibration5Ref.current) {
         vibration5Ref.current = true;
         vibrate('medium');
+        if (!isPomodoroMode) {
+          playSound('warning');
+          sendNotification('Kotomodoro', 'Target time in 5 minutes!');
+        }
       }
 
       // 1-minute warning
@@ -243,6 +251,8 @@ export function useTimer(): UseTimerReturn {
         if (isPomodoroMode) {
           const label = pomodoroPhase === 'work' ? 'Work session' : 'Break';
           sendNotification('Kotomodoro', `${label} ending in 1 minute`);
+        } else {
+          sendNotification('Kotomodoro', 'Target time in 1 minute!');
         }
       }
 
