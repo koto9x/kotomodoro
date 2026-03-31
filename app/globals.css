@@ -82,90 +82,24 @@
 }
 
 @layer utilities {
-  .perspective-1000 {
-    perspective: 1000px;
-  }
-  .backface-hidden {
-    backface-visibility: hidden;
-  }
-  
-  @keyframes flip-top-half {
-    0% { transform: rotateX(0); }
-    100% { transform: rotateX(-90deg); }
-  }
-  
-  @keyframes flip-bottom-half {
-    0% { transform: rotateX(90deg); }
-    100% { transform: rotateX(0); }
-  }
-  
-  @keyframes fade-in {
-    0% { opacity: 0; }
-    100% { opacity: 0.5; }
-  }
-  
-  @keyframes fade-out {
-    0% { opacity: 0.5; }
-    100% { opacity: 0; }
-  }
-  
-  @keyframes flipDown {
-    0% { transform: rotateX(0); }
-    100% { transform: rotateX(90deg); }
-  }
-  
-  @keyframes flipUp {
-    0% { transform: rotateX(-90deg); }
-    100% { transform: rotateX(0); }
-  }
-  
-  @keyframes fadeIn {
-    0% { opacity: 0; }
-    100% { opacity: 0.4; }
-  }
-  
-  @keyframes fadeOut {
-    0% { opacity: 0.4; }
-    100% { opacity: 0; }
-  }
-  
-  @keyframes flipTop {
-    0% { transform: rotateX(0); }
-    100% { transform: rotateX(-90deg); }
-  }
-  
-  @keyframes flipBottom {
-    0% { transform: rotateX(90deg); }
-    100% { transform: rotateX(0); }
-  }
-  
-  @keyframes fadeInShadow {
-    0% { opacity: 0; }
-    100% { opacity: 1; }
-  }
-  
-  @keyframes fadeOutShadow {
-    0% { opacity: 1; }
-    100% { opacity: 0; }
-  }
-  
+  /* Flip clock animations - 4 canonical keyframes */
   @keyframes flip-top {
-    0% { transform: rotateX(0); }
-    100% { transform: rotateX(-90deg); }
+    from { transform: rotateX(0deg); }
+    to   { transform: rotateX(-90deg); }
   }
-  
+
   @keyframes flip-bottom {
-    0% { transform: rotateX(90deg); }
-    100% { transform: rotateX(0); }
+    from { transform: rotateX(90deg); }
+    to   { transform: rotateX(0deg); }
   }
-  
-  @keyframes fade-shadow {
-    0% { opacity: 0; }
-    100% { opacity: 0.5; }
+
+  @keyframes flip-shadow-in {
+    from { opacity: 0; }
+    to   { opacity: 0.4; }
   }
-  
-  @keyframes fade-shadow-out {
-    0% { opacity: 0.5; }
-    100% { opacity: 0; }
+
+  @keyframes flip-shadow-out {
+    from { opacity: 0.5; }
+    to   { opacity: 0; }
   }
 }

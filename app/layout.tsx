@@ -1,15 +1,28 @@
 import './globals.css';
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import { ThemeProvider } from '@/components/theme-provider';
 import { SoundProvider } from '@/contexts/sound-context';
 
-const inter = Inter({ subsets: ['latin'] });
-
 export const metadata: Metadata = {
-  title: 'Chronos | Modern Countdown Timer',
-  description: 'A minimalist countdown timer with ADHD-friendly features',
+  title: 'Kotomodoro | Pomodoro & Countdown Timer',
+  description: 'Pomodoro timer & target time countdown',
   manifest: '/manifest.json',
+  themeColor: '#000000',
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Kotomodoro',
+  },
+  icons: {
+    icon: '/icon.svg',
+    apple: '/icon-192x192.png',
+  },
 };
 
 export default function RootLayout({
@@ -19,12 +32,23 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${inter.className} dark`}>
+      <body className="font-mono dark">
         <SoundProvider>
           <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
             {children}
           </ThemeProvider>
         </SoundProvider>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                  navigator.serviceWorker.register('/sw.js').catch(() => {});
+                });
+              }
+            `,
+          }}
+        />
       </body>
     </html>
   );

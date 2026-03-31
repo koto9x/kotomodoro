@@ -1,12 +1,21 @@
 {
-  "name": "Chronos - Modern Countdown Timer",
-  "short_name": "Chronos",
-  "description": "A minimalist countdown timer with ADHD-friendly features",
+  "name": "Kotomodoro",
+  "short_name": "Kotomodoro",
+  "description": "Pomodoro timer & target time countdown",
   "start_url": "/",
+  "scope": "/",
+  "id": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#000000",
   "theme_color": "#000000",
   "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
     {
       "src": "/icon-192x192.png",
       "sizes": "192x192",
