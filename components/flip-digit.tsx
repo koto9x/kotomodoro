@@ -94,12 +94,12 @@ function SingleDigit({ current, previous, isFlipping }: {
         <DigitFace char={current} />
       </div>
 
-      {/* Static bottom half: current digit */}
+      {/* Static bottom half: shows OLD digit during flip, NEW digit after */}
       <div
         className="absolute inset-0 bg-zinc-950 border border-zinc-800 rounded-md overflow-hidden"
         style={{ clipPath: 'inset(50% 0 0 0)' }}
       >
-        <DigitFace char={current} />
+        <DigitFace char={isFlipping ? previous : current} />
       </div>
 
       {/* Animated top flap: old digit folds down */}
