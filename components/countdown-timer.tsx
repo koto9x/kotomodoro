@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Settings2, CheckCircle2, XCircle, Volume2, VolumeX } from 'lucide-react';
@@ -17,14 +18,23 @@ import { TimerDisplay } from './timer-display';
 import { TimerControls } from './timer-controls';
 import { PomodoroStatus } from './pomodoro-status';
 import { TargetTimePicker } from './target-time-picker';
+import { TargetTimeHeader } from './target-time-header';
 import { SettingsPanel } from './settings-panel';
 
 const CountdownTimer = () => {
   const { soundEnabled, toggleSound } = useSound();
   const [showTaskDialog, setShowTaskDialog] = useState(false);
   const [displaySettings, setDisplaySettings] = useState<DisplaySettings>(() => storage.getDisplaySettings());
+  const [currentTime, setCurrentTime] = useState<Date | null>(null);
 
   const timer = useTimer();
+
+  // Update current time every second
+  useEffect(() => {
+    setCurrentTime(new Date());
+    const interval = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const updateDisplaySettings = useCallback((partial: Partial<DisplaySettings>) => {
     setDisplaySettings(prev => {
@@ -45,7 +55,7 @@ const CountdownTimer = () => {
 
   return (
     <div className={cn(
-      "flex flex-col items-center justify-center w-full min-h-screen p-4 space-y-4 transition-colors duration-1000",
+      "flex flex-col items-center w-full min-h-screen p-4 transition-colors duration-1000",
       timer.isPomodoroMode && "bg-background",
       !timer.isPomodoroMode && {
         "bg-background": timer.urgencyLevel === 'normal',
@@ -121,7 +131,6 @@ const CountdownTimer = () => {
                 }
               }}
               className="h-12 text-base px-4 rounded-lg"
-              autoFocus
             />
             <div className="flex flex-col sm:flex-row justify-end gap-3">
               <Button
@@ -170,54 +179,80 @@ const CountdownTimer = () => {
         )}
       </AnimatePresence>
 
-      {/* Pomodoro status badge */}
-      {timer.isPomodoroMode && (
-        <PomodoroStatus
+      {/* Main content - vertically centered */}
+      <div className="flex-1 flex flex-col items-center justify-center w-full max-w-md mx-auto gap-4">
+        {/* Pomodoro status badge */}
+        {timer.isPomodoroMode && (
+          <PomodoroStatus
+            isRunning={timer.isRunning}
+            pomodoroPhase={timer.pomodoroPhase}
+            pomodoroCount={timer.pomodoroCount}
+            targetCount={timer.settings.targetPomodoroCount}
+          />
+        )}
+
+        {/* Target time header (countdown mode only) */}
+        <TargetTimeHeader
+          targetDate={timer.targetDate}
+          isRunning={timer.isRunning}
+          isPomodoroMode={timer.isPomodoroMode}
+          urgencyLevel={timer.urgencyLevel}
+          use24HourTime={displaySettings.use24HourTime}
+        />
+
+        {/* Current time above flip clock (when no target time header showing) */}
+        {(timer.isPomodoroMode || !timer.isRunning || !timer.targetDate) && (
+          <div className="text-sm font-mono text-zinc-500 tracking-wider">
+            {currentTime ? format(currentTime, displaySettings.use24HourTime ? 'HH:mm:ss' : 'hh:mm:ss a') : ''}
+          </div>
+        )}
+
+        {/* Flip clock display */}
+        <TimerDisplay
+          timeLeft={timer.timeLeft}
+          showSeconds={displaySettings.showSeconds}
+        />
+
+        {/* Task input (pomodoro mode) */}
+        {timer.isPomodoroMode && (
+          <div className="w-full">
+            <Input
+              placeholder="What are you working on?"
+              value={timer.currentTask}
+              onChange={(e) => timer.setCurrentTask(e.target.value)}
+              className="text-center h-12 sm:h-10 text-base sm:text-sm"
+            />
+          </div>
+        )}
+
+        {/* Control buttons */}
+        <TimerControls
+          isPomodoroMode={timer.isPomodoroMode}
           isRunning={timer.isRunning}
           pomodoroPhase={timer.pomodoroPhase}
-          pomodoroCount={timer.pomodoroCount}
-          targetCount={timer.settings.targetPomodoroCount}
+          onStartPomodoro={handleStartPomodoro}
+          onPause={timer.pauseTimer}
+          onResume={timer.resumeTimer}
+          onSkip={timer.skipToNextPhase}
+          onStop={timer.stopPomodoro}
+          onStopCountdown={timer.stopCountdown}
         />
-      )}
 
-      {/* Flip clock display */}
-      <TimerDisplay
-        timeLeft={timer.timeLeft}
-        showSeconds={displaySettings.showSeconds}
-      />
+        {/* Target time picker */}
+        <TargetTimePicker
+          targetDate={timer.targetDate}
+          isPomodoroMode={timer.isPomodoroMode}
+          use24HourTime={displaySettings.use24HourTime}
+          onSetTargetTime={timer.setTargetTime}
+        />
+      </div>
 
-      {/* Task input (pomodoro mode) */}
-      {timer.isPomodoroMode && (
-        <div className="w-full max-w-md mb-6">
-          <Input
-            placeholder="What are you working on?"
-            value={timer.currentTask}
-            onChange={(e) => timer.setCurrentTask(e.target.value)}
-            className="text-center h-12 sm:h-10 text-base sm:text-sm"
-          />
+      {/* Current date/time pinned near bottom */}
+      <div className="pb-6 pt-4">
+        <div className="text-xs font-mono text-zinc-600 text-center">
+          {currentTime ? format(currentTime, displaySettings.use24HourTime ? 'yyyy/MM/dd HH:mm:ss' : 'yyyy/MM/dd hh:mm:ss a') : ''}
         </div>
-      )}
-
-      {/* Control buttons */}
-      <TimerControls
-        isPomodoroMode={timer.isPomodoroMode}
-        isRunning={timer.isRunning}
-        pomodoroPhase={timer.pomodoroPhase}
-        onStartPomodoro={handleStartPomodoro}
-        onPause={timer.pauseTimer}
-        onResume={timer.resumeTimer}
-        onSkip={timer.skipToNextPhase}
-        onStop={timer.stopPomodoro}
-        onStopCountdown={timer.stopCountdown}
-      />
-
-      {/* Target time picker */}
-      <TargetTimePicker
-        targetDate={timer.targetDate}
-        isPomodoroMode={timer.isPomodoroMode}
-        use24HourTime={displaySettings.use24HourTime}
-        onSetTargetTime={timer.setTargetTime}
-      />
+      </div>
     </div>
   );
 };
