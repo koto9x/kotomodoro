@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Settings2, CheckCircle2, XCircle, Volume2, VolumeX } from 'lucide-react';
@@ -9,8 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { cn } from '@/lib/utils';
 import { useSound } from '@/contexts/sound-context';
 import { useTimer } from '@/hooks/use-timer';
+import { storage } from '@/lib/storage';
 import { AnimatePresence, motion } from 'framer-motion';
-import { DEFAULT_DISPLAY_SETTINGS } from '@/lib/timer-types';
 import type { DisplaySettings } from '@/lib/timer-types';
 
 import { TimerDisplay } from './timer-display';
@@ -22,13 +22,17 @@ import { SettingsPanel } from './settings-panel';
 const CountdownTimer = () => {
   const { soundEnabled, toggleSound } = useSound();
   const [showTaskDialog, setShowTaskDialog] = useState(false);
-  const [displaySettings, setDisplaySettings] = useState<DisplaySettings>(DEFAULT_DISPLAY_SETTINGS);
+  const [displaySettings, setDisplaySettings] = useState<DisplaySettings>(() => storage.getDisplaySettings());
 
   const timer = useTimer();
 
-  const updateDisplaySettings = (partial: Partial<DisplaySettings>) => {
-    setDisplaySettings(prev => ({ ...prev, ...partial }));
-  };
+  const updateDisplaySettings = useCallback((partial: Partial<DisplaySettings>) => {
+    setDisplaySettings(prev => {
+      const next = { ...prev, ...partial };
+      storage.saveDisplaySettings(next);
+      return next;
+    });
+  }, []);
 
   const handleStartPomodoro = () => {
     setShowTaskDialog(true);

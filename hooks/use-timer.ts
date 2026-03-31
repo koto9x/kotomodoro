@@ -4,11 +4,11 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { addMinutes, differenceInMilliseconds } from 'date-fns';
 import { useSound } from '@/contexts/sound-context';
 import { getTimeUnits, getUrgencyLevel } from '@/lib/timer-utils';
+import { storage } from '@/lib/storage';
 import type { TimeUnit, UrgencyLevel, PomodoroPhase, TimerSettings } from '@/lib/timer-types';
 import { DEFAULT_TIMER_SETTINGS } from '@/lib/timer-types';
 
 export interface UseTimerReturn {
-  // State
   timeLeft: TimeUnit[];
   isRunning: boolean;
   isPomodoroMode: boolean;
@@ -21,7 +21,6 @@ export interface UseTimerReturn {
   showWorkEndCue: boolean;
   showBreakEndCue: boolean;
 
-  // Actions
   setCurrentTask: (task: string) => void;
   updateSettings: (s: Partial<TimerSettings>) => void;
   startPomodoro: () => void;
@@ -39,6 +38,7 @@ export function useTimer(): UseTimerReturn {
   const mounted = useRef(false);
   const remainingMsRef = useRef<number | null>(null);
 
+  // Initialize from persisted storage
   const [targetDate, setTargetDate] = useState<Date | null>(null);
   const [timeLeft, setTimeLeft] = useState<TimeUnit[]>([]);
   const [isPomodoroMode, setIsPomodoroMode] = useState(false);
@@ -52,15 +52,30 @@ export function useTimer(): UseTimerReturn {
   const [settings, setSettings] = useState<TimerSettings>(DEFAULT_TIMER_SETTINGS);
 
   const updateSettings = useCallback((partial: Partial<TimerSettings>) => {
-    setSettings(prev => ({ ...prev, ...partial }));
+    setSettings(prev => {
+      const next = { ...prev, ...partial };
+      storage.saveTimerSettings(next);
+      return next;
+    });
   }, []);
 
   const pauseTimer = useCallback(() => {
     if (targetDate) {
-      remainingMsRef.current = Math.max(0, targetDate.getTime() - Date.now());
+      const remaining = Math.max(0, targetDate.getTime() - Date.now());
+      remainingMsRef.current = remaining;
+      // Persist session state when pausing in pomodoro mode
+      if (isPomodoroMode) {
+        storage.saveSessionState({
+          remainingMs: remaining,
+          pomodoroPhase: pomodoroPhase,
+          pomodoroCount: pomodoroCount,
+          currentTask: currentTask,
+          savedAt: Date.now(),
+        });
+      }
     }
     setIsRunning(false);
-  }, [targetDate]);
+  }, [targetDate, isPomodoroMode, pomodoroPhase, pomodoroCount, currentTask]);
 
   const initializePomodoro = useCallback(() => {
     setIsPomodoroMode(true);
@@ -70,6 +85,7 @@ export function useTimer(): UseTimerReturn {
     const newTarget = addMinutes(now, settings.pomodoroLength);
     setTargetDate(newTarget);
     remainingMsRef.current = null;
+    storage.clearSessionState();
     setTimeLeft(getTimeUnits(settings.pomodoroLength * 60 * 1000, true));
     setIsRunning(true);
   }, [settings.pomodoroLength]);
@@ -79,6 +95,7 @@ export function useTimer(): UseTimerReturn {
     setIsRunning(false);
     setPomodoroPhase('work');
     remainingMsRef.current = null;
+    storage.clearSessionState();
   }, []);
 
   const startBreak = useCallback(() => {
@@ -108,6 +125,7 @@ export function useTimer(): UseTimerReturn {
       setTimeLeft(getTimeUnits(remaining, isPomodoroMode));
     }
     remainingMsRef.current = null;
+    storage.clearSessionState();
     setIsRunning(true);
   }, [isPomodoroMode]);
 
@@ -119,6 +137,7 @@ export function useTimer(): UseTimerReturn {
       startNextPomodoro();
       if (settings.autoStartPomodoros) setIsRunning(true);
     }
+    storage.clearSessionState();
   }, [pomodoroPhase, startBreak, startNextPomodoro, settings.autoStartBreaks, settings.autoStartPomodoros]);
 
   const setTargetTime = useCallback((date: Date) => {
@@ -138,15 +157,43 @@ export function useTimer(): UseTimerReturn {
     remainingMsRef.current = null;
   }, []);
 
-  // Mount tracking
+  // Initialize from storage on mount
   useEffect(() => {
     mounted.current = true;
-    // Initialize with default display
+
+    // Load persisted settings
+    const savedSettings = storage.getTimerSettings();
+    setSettings(savedSettings);
+
+    // Check for a saved pomodoro session
+    const savedSession = storage.getSessionState();
+    if (savedSession) {
+      // Session is still valid if saved less than 2 hours ago
+      const age = Date.now() - savedSession.savedAt;
+      if (age < 2 * 60 * 60 * 1000 && savedSession.remainingMs > 0) {
+        setIsPomodoroMode(true);
+        setPomodoroPhase(savedSession.pomodoroPhase);
+        setPomodoroCount(savedSession.pomodoroCount);
+        setCurrentTask(savedSession.currentTask);
+        remainingMsRef.current = savedSession.remainingMs;
+        const now = new Date();
+        const newTarget = new Date(now.getTime() + savedSession.remainingMs);
+        setTargetDate(newTarget);
+        setTimeLeft(getTimeUnits(savedSession.remainingMs, true));
+        // Don't auto-resume - let user click resume
+        return () => { mounted.current = false; };
+      } else {
+        storage.clearSessionState();
+      }
+    }
+
+    // Default display
     const now = new Date();
-    const initialMs = DEFAULT_TIMER_SETTINGS.pomodoroLength * 60 * 1000;
-    const initialTarget = addMinutes(now, DEFAULT_TIMER_SETTINGS.pomodoroLength);
+    const initialMs = savedSettings.pomodoroLength * 60 * 1000;
+    const initialTarget = addMinutes(now, savedSettings.pomodoroLength);
     setTargetDate(initialTarget);
     setTimeLeft(getTimeUnits(initialMs, false));
+
     return () => { mounted.current = false; };
   }, []);
 
@@ -177,6 +224,14 @@ export function useTimer(): UseTimerReturn {
             const newCount = pomodoroCount + 1;
             setPomodoroCount(newCount);
 
+            // Record completed work session
+            storage.addCompletedSession({
+              task: currentTask,
+              phase: 'work',
+              duration: settings.pomodoroLength,
+              completedAt: Date.now(),
+            });
+
             if (newCount >= settings.targetPomodoroCount) {
               stopPomodoro();
               setCurrentTask('');
@@ -188,6 +243,14 @@ export function useTimer(): UseTimerReturn {
           } else {
             setShowBreakEndCue(true);
             setTimeout(() => setShowBreakEndCue(false), 1000);
+
+            storage.addCompletedSession({
+              task: currentTask,
+              phase: 'break',
+              duration: settings.shortBreakLength,
+              completedAt: Date.now(),
+            });
+
             startNextPomodoro();
             if (settings.autoStartPomodoros) setIsRunning(true);
           }
@@ -196,7 +259,7 @@ export function useTimer(): UseTimerReturn {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [targetDate, isRunning, isPomodoroMode, pomodoroPhase, settings.autoStartPomodoros, settings.targetPomodoroCount, pomodoroCount, startBreak, startNextPomodoro, playCompletionSound, stopPomodoro, settings.autoStartBreaks]);
+  }, [targetDate, isRunning, isPomodoroMode, pomodoroPhase, settings, pomodoroCount, currentTask, startBreak, startNextPomodoro, playCompletionSound, stopPomodoro]);
 
   return {
     timeLeft,
@@ -212,7 +275,7 @@ export function useTimer(): UseTimerReturn {
     showBreakEndCue,
     setCurrentTask,
     updateSettings,
-    startPomodoro: useCallback(() => {}, []), // placeholder - dialog opens in UI
+    startPomodoro: useCallback(() => {}, []),
     initializePomodoro,
     stopPomodoro,
     pauseTimer,
