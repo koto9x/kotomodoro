@@ -16,9 +16,7 @@ export function FlipDigit({ digit, unit, visible = true }: FlipDigitProps) {
 
   useEffect(() => {
     if (digit !== currentDigit) {
-      // Store the old digit for the flip-away animation
       setPrevDigit(currentDigit);
-      // Update to new digit immediately (static halves show new value)
       setCurrentDigit(digit);
       setIsFlipping(true);
 
@@ -26,7 +24,6 @@ export function FlipDigit({ digit, unit, visible = true }: FlipDigitProps) {
         clearTimeout(timerRef.current);
       }
 
-      // Animation completes in 400ms total (200ms top + 200ms bottom w/ 200ms delay)
       timerRef.current = setTimeout(() => {
         setIsFlipping(false);
       }, 400);
@@ -65,35 +62,47 @@ export function FlipDigit({ digit, unit, visible = true }: FlipDigitProps) {
   );
 }
 
+/**
+ * Renders a digit clipped to show only the top or bottom half.
+ * The full digit is centered in a full-height container, then offset
+ * so only the correct half is visible through overflow:hidden.
+ */
+function HalfDigit({ char, half }: { char: string; half: 'top' | 'bottom' }) {
+  return (
+    <div
+      className="absolute inset-0 flex items-center justify-center"
+      style={{
+        top: half === 'top' ? 0 : '-100%',
+      }}
+    >
+      <span className="text-4xl sm:text-5xl font-mono font-bold text-white select-none">
+        {char}
+      </span>
+    </div>
+  );
+}
+
 function SingleDigit({ current, previous, isFlipping }: {
   current: string;
   previous: string;
   isFlipping: boolean;
 }) {
   return (
-    <div className="relative w-12 h-20 sm:w-14 sm:h-24" style={{ perspective: '800px' }}>
-      {/* Static top half - shows NEW digit top half */}
-      <div className="absolute inset-0 h-1/2 bg-black border border-b-0 border-zinc-800 rounded-t-md overflow-hidden">
-        <div className="h-full w-full relative">
-          <span className="absolute bottom-0 left-1/2 -translate-x-1/2 text-3xl sm:text-4xl font-mono font-bold text-white leading-none">
-            {current}
-          </span>
-        </div>
+    <div className="relative w-11 h-16 sm:w-14 sm:h-20" style={{ perspective: '800px' }}>
+      {/* === STATIC TOP HALF === shows current digit's top half */}
+      <div className="absolute inset-0 h-1/2 overflow-hidden bg-zinc-950 border border-b-0 border-zinc-800 rounded-t-md">
+        <HalfDigit char={current} half="top" />
       </div>
 
-      {/* Static bottom half - shows NEW digit bottom half */}
-      <div className="absolute inset-0 top-1/2 h-1/2 bg-black border border-t-0 border-zinc-800 rounded-b-md overflow-hidden">
-        <div className="h-full w-full relative">
-          <span className="absolute top-0 left-1/2 -translate-x-1/2 text-3xl sm:text-4xl font-mono font-bold text-white leading-none">
-            {current}
-          </span>
-        </div>
+      {/* === STATIC BOTTOM HALF === shows current digit's bottom half */}
+      <div className="absolute left-0 right-0 top-1/2 h-1/2 overflow-hidden bg-zinc-950 border border-t-0 border-zinc-800 rounded-b-md">
+        <HalfDigit char={current} half="bottom" />
       </div>
 
-      {/* Animated top flap - flips DOWN showing OLD digit, reveals new top half behind it */}
+      {/* === ANIMATED TOP FLAP === shows OLD digit, flips down to reveal new top */}
       {isFlipping && (
         <div
-          className="absolute inset-0 h-1/2 bg-black border border-b-0 border-zinc-800 rounded-t-md overflow-hidden z-10"
+          className="absolute inset-0 h-1/2 overflow-hidden bg-zinc-950 border border-b-0 border-zinc-800 rounded-t-md z-10"
           style={{
             transformOrigin: 'bottom center',
             backfaceVisibility: 'hidden',
@@ -101,12 +110,7 @@ function SingleDigit({ current, previous, isFlipping }: {
             animation: 'flip-top 0.2s ease-in forwards',
           }}
         >
-          <div className="h-full w-full relative">
-            <span className="absolute bottom-0 left-1/2 -translate-x-1/2 text-3xl sm:text-4xl font-mono font-bold text-white leading-none">
-              {previous}
-            </span>
-          </div>
-          {/* Shadow overlay - darkens as flap folds away */}
+          <HalfDigit char={previous} half="top" />
           <div
             className="absolute inset-0 bg-black opacity-0"
             style={{ animation: 'flip-shadow-in 0.2s linear forwards' }}
@@ -114,10 +118,10 @@ function SingleDigit({ current, previous, isFlipping }: {
         </div>
       )}
 
-      {/* Animated bottom flap - flips UP revealing NEW digit bottom half */}
+      {/* === ANIMATED BOTTOM FLAP === reveals NEW digit bottom half */}
       {isFlipping && (
         <div
-          className="absolute inset-0 top-1/2 h-1/2 bg-black border border-t-0 border-zinc-800 rounded-b-md overflow-hidden z-10"
+          className="absolute left-0 right-0 top-1/2 h-1/2 overflow-hidden bg-zinc-950 border border-t-0 border-zinc-800 rounded-b-md z-10"
           style={{
             transformOrigin: 'top center',
             backfaceVisibility: 'hidden',
@@ -126,12 +130,7 @@ function SingleDigit({ current, previous, isFlipping }: {
             transform: 'rotateX(90deg)',
           }}
         >
-          <div className="h-full w-full relative">
-            <span className="absolute top-0 left-1/2 -translate-x-1/2 text-3xl sm:text-4xl font-mono font-bold text-white leading-none">
-              {current}
-            </span>
-          </div>
-          {/* Shadow overlay - lightens as flap unfolds */}
+          <HalfDigit char={current} half="bottom" />
           <div
             className="absolute inset-0 bg-black opacity-50"
             style={{ animation: 'flip-shadow-out 0.2s linear 0.2s forwards' }}
@@ -140,7 +139,7 @@ function SingleDigit({ current, previous, isFlipping }: {
       )}
 
       {/* Divider line */}
-      <div className="absolute inset-x-0 top-1/2 h-px bg-zinc-800 z-20" />
+      <div className="absolute inset-x-0 top-1/2 h-px bg-zinc-700 z-20" />
     </div>
   );
 }
