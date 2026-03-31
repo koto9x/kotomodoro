@@ -34,9 +34,10 @@ export interface UseTimerReturn {
 }
 
 export function useTimer(): UseTimerReturn {
-  const { playCompletionSound } = useSound();
+  const { playSound, sendNotification, requestNotificationPermission } = useSound();
   const mounted = useRef(false);
   const remainingMsRef = useRef<number | null>(null);
+  const warningSentRef = useRef(false);
 
   // Initialize from persisted storage
   const [targetDate, setTargetDate] = useState<Date | null>(null);
@@ -81,6 +82,7 @@ export function useTimer(): UseTimerReturn {
     setIsPomodoroMode(true);
     setPomodoroPhase('work');
     setPomodoroCount(0);
+    warningSentRef.current = false;
     const now = new Date();
     const newTarget = addMinutes(now, settings.pomodoroLength);
     setTargetDate(newTarget);
@@ -88,7 +90,10 @@ export function useTimer(): UseTimerReturn {
     storage.clearSessionState();
     setTimeLeft(getTimeUnits(settings.pomodoroLength * 60 * 1000, true));
     setIsRunning(true);
-  }, [settings.pomodoroLength]);
+    playSound('start');
+    // Request notification permission on first pomodoro
+    requestNotificationPermission();
+  }, [settings.pomodoroLength, playSound, requestNotificationPermission]);
 
   const stopPomodoro = useCallback(() => {
     setIsPomodoroMode(false);
@@ -211,11 +216,22 @@ export function useTimer(): UseTimerReturn {
 
       setTimeLeft(getTimeUnits(timeLeftMs, isPomodoroMode));
 
+      // 1-minute warning
+      if (timeLeftMs <= 60 * 1000 && timeLeftMs > 59 * 1000 && !warningSentRef.current) {
+        warningSentRef.current = true;
+        playSound('warning');
+        if (isPomodoroMode) {
+          const label = pomodoroPhase === 'work' ? 'Work session' : 'Break';
+          sendNotification('Kotomodoro', `${label} ending in 1 minute`);
+        }
+      }
+
       if (timeLeftMs <= 0) {
         clearInterval(interval);
         setIsRunning(false);
         remainingMsRef.current = null;
-        playCompletionSound();
+        warningSentRef.current = false;
+        playSound('completion');
 
         if (isPomodoroMode) {
           if (pomodoroPhase === 'work') {
@@ -224,7 +240,6 @@ export function useTimer(): UseTimerReturn {
             const newCount = pomodoroCount + 1;
             setPomodoroCount(newCount);
 
-            // Record completed work session
             storage.addCompletedSession({
               task: currentTask,
               phase: 'work',
@@ -232,13 +247,17 @@ export function useTimer(): UseTimerReturn {
               completedAt: Date.now(),
             });
 
+            sendNotification('Kotomodoro', `Work session complete! (${newCount}/${settings.targetPomodoroCount})`);
+
             if (newCount >= settings.targetPomodoroCount) {
+              sendNotification('Kotomodoro', 'All sessions complete! Great work.');
               stopPomodoro();
               setCurrentTask('');
               return;
             }
 
             startBreak();
+            playSound('phaseChange');
             if (settings.autoStartBreaks) setIsRunning(true);
           } else {
             setShowBreakEndCue(true);
@@ -251,15 +270,20 @@ export function useTimer(): UseTimerReturn {
               completedAt: Date.now(),
             });
 
+            sendNotification('Kotomodoro', 'Break over — time to focus!');
+
             startNextPomodoro();
+            playSound('phaseChange');
             if (settings.autoStartPomodoros) setIsRunning(true);
           }
+        } else {
+          sendNotification('Kotomodoro', 'Target time reached!');
         }
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [targetDate, isRunning, isPomodoroMode, pomodoroPhase, settings, pomodoroCount, currentTask, startBreak, startNextPomodoro, playCompletionSound, stopPomodoro]);
+  }, [targetDate, isRunning, isPomodoroMode, pomodoroPhase, settings, pomodoroCount, currentTask, startBreak, startNextPomodoro, playSound, sendNotification, stopPomodoro]);
 
   return {
     timeLeft,
