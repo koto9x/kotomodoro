@@ -31,73 +31,75 @@ export function TimerControls({
   return (
     <div className="flex flex-col items-stretch gap-3 w-full">
       {isPomodoroMode ? (
-        isRunning ? (
+        <>
+          {isRunning ? (
+            <Button
+              variant="secondary"
+              className={cn(
+                "h-12 sm:h-10 text-base sm:text-sm w-full",
+                pomodoroPhase === 'work' ? 'bg-red-500/10 hover:bg-red-500/20' : 'bg-green-500/10 hover:bg-green-500/20'
+              )}
+              onClick={onPause}
+            >
+              <Pause className="w-4 h-4 mr-2" />
+              Pause {pomodoroPhase === 'work' ? 'Work' : 'Break'}
+            </Button>
+          ) : (
+            <Button
+              variant="secondary"
+              onClick={onResume}
+              className={cn(
+                "h-12 sm:h-10 text-base sm:text-sm w-full",
+                pomodoroPhase === 'work' ? 'bg-red-500/10 hover:bg-red-500/20' : 'bg-green-500/10 hover:bg-green-500/20'
+              )}
+            >
+              <Play className="w-4 h-4 mr-2" />
+              Resume {pomodoroPhase === 'work' ? 'Work' : 'Break'}
+            </Button>
+          )}
+
+          {!isRunning && (
+            <Button
+              variant="outline"
+              className="h-12 sm:h-10 text-base sm:text-sm w-full"
+              onClick={onSkip}
+            >
+              <SkipForward className="w-4 h-4 mr-2" />
+              Skip to {pomodoroPhase === 'work' ? 'Break' : 'Work'}
+            </Button>
+          )}
+
           <Button
-            variant="secondary"
-            className={cn(
-              "h-12 sm:h-10 text-base sm:text-sm w-full",
-              pomodoroPhase === 'work' ? 'bg-red-500/10 hover:bg-red-500/20' : 'bg-green-500/10 hover:bg-green-500/20'
-            )}
-            onClick={onPause}
+            variant="outline"
+            className="text-destructive hover:text-destructive h-12 sm:h-10 text-base sm:text-sm w-full"
+            onClick={onStop}
           >
-            <Pause className="w-4 h-4 mr-2" />
-            Pause {pomodoroPhase === 'work' ? 'Work' : 'Break'}
+            <Square className="w-4 h-4 mr-2" />
+            Stop Session
           </Button>
-        ) : (
-          <Button
-            variant="secondary"
-            onClick={onResume}
-            className={cn(
-              "h-12 sm:h-10 text-base sm:text-sm w-full",
-              pomodoroPhase === 'work' ? 'bg-red-500/10 hover:bg-red-500/20' : 'bg-green-500/10 hover:bg-green-500/20'
-            )}
-          >
-            <Play className="w-4 h-4 mr-2" />
-            Resume {pomodoroPhase === 'work' ? 'Work' : 'Break'}
-          </Button>
-        )
+        </>
       ) : (
-        <Button
-          variant="outline"
-          className="h-12 sm:h-10 text-base sm:text-sm w-full"
-          onClick={onStartPomodoro}
-        >
-          <Timer className="w-4 h-4 mr-2" />
-          Pomodoro
-        </Button>
-      )}
+        <>
+          <Button
+            variant="outline"
+            className="h-12 sm:h-10 text-base sm:text-sm w-full"
+            onClick={onStartPomodoro}
+          >
+            <Timer className="w-4 h-4 mr-2" />
+            Pomodoro
+          </Button>
 
-      {isPomodoroMode && !isRunning && (
-        <Button
-          variant="outline"
-          className="h-12 sm:h-10 text-base sm:text-sm w-full"
-          onClick={onSkip}
-        >
-          <SkipForward className="w-4 h-4 mr-2" />
-          Skip to {pomodoroPhase === 'work' ? 'Break' : 'Work'}
-        </Button>
-      )}
-
-      {isPomodoroMode && (
-        <Button
-          variant="outline"
-          className="text-destructive hover:text-destructive h-12 sm:h-10 text-base sm:text-sm w-full"
-          onClick={onStop}
-        >
-          <Square className="w-4 h-4 mr-2" />
-          Stop Session
-        </Button>
-      )}
-
-      {!isPomodoroMode && isRunning && (
-        <Button
-          variant="secondary"
-          className="h-12 sm:h-10 text-base sm:text-sm w-full"
-          onClick={onStopCountdown}
-        >
-          <Clock className="w-4 h-4 mr-2" />
-          Stop Countdown
-        </Button>
+          {isRunning && (
+            <Button
+              variant="secondary"
+              className="h-12 sm:h-10 text-base sm:text-sm w-full"
+              onClick={onStopCountdown}
+            >
+              <Clock className="w-4 h-4 mr-2" />
+              Stop Countdown
+            </Button>
+          )}
+        </>
       )}
     </div>
   );

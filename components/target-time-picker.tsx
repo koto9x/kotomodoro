@@ -25,7 +25,7 @@ export function TargetTimePicker({
 
   return (
     <div className={cn(
-      "w-full max-w-xs mx-auto transition-all duration-300",
+      "w-full transition-all duration-300",
       isPomodoroMode ? "opacity-0 invisible h-0" : "opacity-100 visible"
     )}>
       <Input
@@ -38,7 +38,7 @@ export function TargetTimePicker({
             onSetTargetTime(newDate);
           }
         }}
-        className="w-full text-base sm:text-sm h-12 sm:h-10 px-4 py-2 bg-background border rounded-md text-center"
+        className="w-full text-base sm:text-sm h-12 sm:h-10 px-4 py-2 bg-background border rounded-md"
         value={targetDate && !isPomodoroMode ? format(targetDate, "yyyy-MM-dd'T'HH:mm") : ''}
       />
     </div>

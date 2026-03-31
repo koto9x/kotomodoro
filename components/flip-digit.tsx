@@ -26,7 +26,7 @@ export function FlipDigit({ digit, unit, visible = true }: FlipDigitProps) {
 
       timerRef.current = setTimeout(() => {
         setIsFlipping(false);
-      }, 400);
+      }, 500);
     }
 
     return () => {
@@ -42,7 +42,7 @@ export function FlipDigit({ digit, unit, visible = true }: FlipDigitProps) {
   const formattedPrevious = prevDigit.toString().padStart(2, '0');
 
   return (
-    <div className="flex flex-col items-center transition-all duration-300">
+    <div className="flex flex-col items-center">
       <div className="flex gap-1">
         <SingleDigit
           current={formattedCurrent[0]}
@@ -55,7 +55,7 @@ export function FlipDigit({ digit, unit, visible = true }: FlipDigitProps) {
           isFlipping={isFlipping && formattedCurrent[1] !== formattedPrevious[1]}
         />
       </div>
-      <span className="mt-2 text-xs font-mono uppercase tracking-wider text-zinc-400 transition-opacity duration-300">
+      <span className="mt-2 text-xs font-mono uppercase tracking-wider text-zinc-400">
         {unit}
       </span>
     </div>
@@ -63,29 +63,17 @@ export function FlipDigit({ digit, unit, visible = true }: FlipDigitProps) {
 }
 
 /**
- * A full-size digit that is clipped to show only the top or bottom half
- * using clip-path: inset(). This is the only reliable cross-browser/mobile
- * approach — it actually removes rendering of the clipped portion.
+ * A full-card-sized digit centered with flexbox, clipped to half via clip-path.
+ * clip-path is on the OUTER wrapper. Any 3D transform goes on this wrapper too,
+ * but we split them: clip-path clips the resting content, and when we need to
+ * animate, we use a separate wrapper pattern.
  */
-function ClippedDigit({ char, half, className, style }: {
-  char: string;
-  half: 'top' | 'bottom';
-  className?: string;
-  style?: React.CSSProperties;
-}) {
+function DigitFace({ char, className }: { char: string; className?: string }) {
   return (
-    <div
-      className={`absolute inset-0 ${className || ''}`}
-      style={{
-        clipPath: half === 'top' ? 'inset(0 0 50% 0)' : 'inset(50% 0 0 0)',
-        ...style,
-      }}
-    >
-      <div className="w-full h-full flex items-center justify-center">
-        <span className="text-4xl sm:text-5xl font-mono font-bold text-white select-none">
-          {char}
-        </span>
-      </div>
+    <div className={`w-full h-full flex items-center justify-center ${className || ''}`}>
+      <span className="text-4xl sm:text-5xl font-mono font-bold text-white select-none">
+        {char}
+      </span>
     </div>
   );
 }
@@ -95,51 +83,76 @@ function SingleDigit({ current, previous, isFlipping }: {
   previous: string;
   isFlipping: boolean;
 }) {
+  // The card is the full height. Each "half" is positioned absolutely to fill
+  // the full card, but clip-path cuts it to show only top or bottom 50%.
+  // For the animated flaps, clip-path is on an outer wrapper and the 3D
+  // transform is on an inner div, so clip-path doesn't interfere with the rotation.
   return (
-    <div className="relative w-11 h-16 sm:w-14 sm:h-20" style={{ perspective: '800px' }}>
-      {/* Static top half — current digit, clipped to top 50% */}
-      <ClippedDigit
-        char={current}
-        half="top"
-        className="bg-zinc-950 border border-zinc-800 rounded-md"
-      />
+    <div className="relative w-11 h-16 sm:w-14 sm:h-20">
+      {/* ===== STATIC TOP HALF: current digit ===== */}
+      <div
+        className="absolute inset-0 bg-zinc-950 border border-zinc-800 rounded-md overflow-hidden"
+        style={{ clipPath: 'inset(0 0 50% 0)' }}
+      >
+        <DigitFace char={current} />
+      </div>
 
-      {/* Static bottom half — current digit, clipped to bottom 50% */}
-      <ClippedDigit
-        char={current}
-        half="bottom"
-        className="bg-zinc-950 border border-zinc-800 rounded-md"
-      />
+      {/* ===== STATIC BOTTOM HALF: current digit ===== */}
+      <div
+        className="absolute inset-0 bg-zinc-950 border border-zinc-800 rounded-md overflow-hidden"
+        style={{ clipPath: 'inset(50% 0 0 0)' }}
+      >
+        <DigitFace char={current} />
+      </div>
 
-      {/* Animated top flap — OLD digit flips down, revealing new digit behind */}
+      {/* ===== ANIMATED TOP FLAP: old digit folds down ===== */}
+      {/* Outer div clips to top half. Inner div does the 3D rotation. */}
+      {/* This separation is critical: clip-path on a rotating element */}
+      {/* clips the rotated result, hiding the animation. */}
       {isFlipping && (
-        <ClippedDigit
-          char={previous}
-          half="top"
-          className="bg-zinc-950 border border-zinc-800 rounded-md z-10"
-          style={{
-            transformOrigin: 'center bottom',
-            backfaceVisibility: 'hidden',
-            willChange: 'transform',
-            animation: 'flip-top 0.2s ease-in forwards',
-          }}
-        />
+        <div
+          className="absolute inset-0 z-10"
+          style={{ clipPath: 'inset(0 0 50% 0)' }}
+        >
+          <div
+            className="absolute inset-0 bg-zinc-950 border border-zinc-800 rounded-md overflow-hidden"
+            style={{
+              transformOrigin: 'center bottom',
+              animation: 'flip-top 0.3s ease-in forwards',
+            }}
+          >
+            <DigitFace char={previous} />
+            {/* Darken as it folds away */}
+            <div
+              className="absolute inset-0 bg-black opacity-0"
+              style={{ animation: 'flip-shadow-in 0.3s linear forwards' }}
+            />
+          </div>
+        </div>
       )}
 
-      {/* Animated bottom flap — NEW digit unfolds from top */}
+      {/* ===== ANIMATED BOTTOM FLAP: new digit unfolds ===== */}
       {isFlipping && (
-        <ClippedDigit
-          char={current}
-          half="bottom"
-          className="bg-zinc-950 border border-zinc-800 rounded-md z-10"
-          style={{
-            transformOrigin: 'center top',
-            backfaceVisibility: 'hidden',
-            willChange: 'transform',
-            transform: 'rotateX(90deg)',
-            animation: 'flip-bottom 0.2s ease-out 0.2s forwards',
-          }}
-        />
+        <div
+          className="absolute inset-0 z-10"
+          style={{ clipPath: 'inset(50% 0 0 0)' }}
+        >
+          <div
+            className="absolute inset-0 bg-zinc-950 border border-zinc-800 rounded-md overflow-hidden"
+            style={{
+              transformOrigin: 'center top',
+              transform: 'rotateX(90deg)',
+              animation: 'flip-bottom 0.3s ease-out 0.3s forwards',
+            }}
+          >
+            <DigitFace char={current} />
+            {/* Lighten as it unfolds */}
+            <div
+              className="absolute inset-0 bg-black opacity-50"
+              style={{ animation: 'flip-shadow-out 0.3s linear 0.3s forwards' }}
+            />
+          </div>
+        </div>
       )}
 
       {/* Divider line at the fold */}

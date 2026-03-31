@@ -84,13 +84,13 @@
 @layer utilities {
   /* Flip clock animations - 4 canonical keyframes */
   @keyframes flip-top {
-    from { transform: rotateX(0deg); }
-    to   { transform: rotateX(-90deg); }
+    from { transform: perspective(400px) rotateX(0deg); }
+    to   { transform: perspective(400px) rotateX(-90deg); }
   }
 
   @keyframes flip-bottom {
-    from { transform: rotateX(90deg); }
-    to   { transform: rotateX(0deg); }
+    from { transform: perspective(400px) rotateX(90deg); }
+    to   { transform: perspective(400px) rotateX(0deg); }
   }
 
   @keyframes flip-shadow-in {
