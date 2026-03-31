@@ -2,24 +2,23 @@
 
 import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
 import { FlipDigit } from './flip-digit';
-import { differenceInSeconds, addMinutes, format, addHours, differenceInMilliseconds } from 'date-fns';
+import { addMinutes, format, differenceInMilliseconds } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Settings2, Timer, Play, Pause, CheckCircle2, XCircle } from 'lucide-react';
+import { Settings2, Timer, Play, Pause, CheckCircle2, XCircle, SkipForward, Square } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Volume2, VolumeX, Clock, AlarmClockOff as ClockOff } from 'lucide-react';
+import { Volume2, VolumeX, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useSound, SoundType } from '@/contexts/sound-context';
+import { useSound } from '@/contexts/sound-context';
 import { AnimatePresence, motion } from 'framer-motion';
 
 const DEFAULT_POMODORO_LENGTH = 25;
 
 function useIsomorphicLayoutEffect(effect: () => void | (() => void), deps?: React.DependencyList) {
   const isBrowser = typeof window !== 'undefined';
-  
   if (isBrowser) {
     // eslint-disable-next-line react-hooks/rules-of-hooks
     return useLayoutEffect(effect, deps);
@@ -44,24 +43,23 @@ interface TimeUnit {
   show: boolean;
 }
 
-function getTimeUnits(timeLeftMs: number): TimeUnit[] {
+function getTimeUnits(timeLeftMs: number, pomodoroMode: boolean): TimeUnit[] {
   const days = Math.floor(timeLeftMs / (24 * 60 * 60 * 1000));
   const hours = Math.floor((timeLeftMs % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
   const minutes = Math.floor((timeLeftMs % (60 * 60 * 1000)) / (60 * 1000));
   const seconds = Math.floor((timeLeftMs % (60 * 1000)) / 1000);
-  
+
   const units = [
     { value: days, label: 'days', show: days > 0 },
     { value: hours, label: 'hours', show: hours > 0 || days > 0 },
     { value: minutes, label: 'minutes', show: true },
     { value: seconds, label: 'seconds', show: true }
   ];
-  
-  // Filter out unnecessary units for Pomodoro mode
-  if (window.__POMODORO_MODE) {
+
+  if (pomodoroMode) {
     return units.filter(unit => ['minutes', 'seconds'].includes(unit.label));
   }
-  
+
   return units;
 }
 
@@ -75,7 +73,7 @@ const CountdownTimer = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [urgencyLevel, setUrgencyLevel] = useState<UrgencyLevel>('normal');
   const [pomodoroPhase, setPomodoroPhase] = useState<'work' | 'break'>('work');
-  const [showSeconds, setShowSeconds] = useState(false);
+  const [showSeconds, setShowSeconds] = useState(true);
   const [use24HourTime, setUse24HourTime] = useState(true);
   const [inputKey, setInputKey] = useState(0);
   const [currentTask, setCurrentTask] = useState('');
@@ -83,21 +81,22 @@ const CountdownTimer = () => {
   const [showTaskDialog, setShowTaskDialog] = useState(false);
   const [showWorkEndCue, setShowWorkEndCue] = useState(false);
   const [showBreakEndCue, setShowBreakEndCue] = useState(false);
+  // Store remaining ms when paused so we can resume accurately
+  const remainingMsRef = useRef<number | null>(null);
   const [settings, setSettings] = useState({
-    pomodoroLength: DEFAULT_POMODORO_LENGTH, // in minutes
+    pomodoroLength: DEFAULT_POMODORO_LENGTH,
     shortBreakLength: 5,
     autoStartBreaks: true,
     autoStartPomodoros: true,
     targetPomodoroCount: 4,
   });
 
-  const startTimer = useCallback(() => {
-    setIsRunning(true);
-  }, []);
-
   const pauseTimer = useCallback(() => {
+    if (targetDate) {
+      remainingMsRef.current = Math.max(0, targetDate.getTime() - Date.now());
+    }
     setIsRunning(false);
-  }, []);
+  }, [targetDate]);
 
   const startPomodoro = useCallback(() => {
     setShowTaskDialog(true);
@@ -107,106 +106,107 @@ const CountdownTimer = () => {
     setIsPomodoroMode(true);
     setPomodoroPhase('work');
     setPomodoroCount(0);
-    window.__POMODORO_MODE = true;
-    const newTarget = addMinutes(new Date(), settings.pomodoroLength);
+    const now = new Date();
+    const newTarget = addMinutes(now, settings.pomodoroLength);
     setTargetDate(newTarget);
-    const timeLeftMs = settings.pomodoroLength * 60 * 1000;
-    setTimeLeft(getTimeUnits(timeLeftMs));
+    remainingMsRef.current = null;
+    setTimeLeft(getTimeUnits(settings.pomodoroLength * 60 * 1000, true));
     setIsRunning(true);
-    startTimer();
   }, [settings.pomodoroLength]);
 
   const stopPomodoro = useCallback(() => {
     setIsPomodoroMode(false);
     setIsRunning(false);
     setPomodoroPhase('work');
-    window.__POMODORO_MODE = false;
+    remainingMsRef.current = null;
   }, []);
 
   const startBreak = useCallback(() => {
     setPomodoroPhase('break');
-    setIsRunning(false);
     const now = new Date();
     const newTarget = addMinutes(now, settings.shortBreakLength);
     setTargetDate(newTarget);
-    setTimeLeft(getTimeUnits(settings.shortBreakLength * 60 * 1000));
-  }, [settings.shortBreakLength, settings.autoStartBreaks]);
+    remainingMsRef.current = null;
+    setTimeLeft(getTimeUnits(settings.shortBreakLength * 60 * 1000, true));
+    // Don't set isRunning here - let the caller (auto-start logic) decide
+  }, [settings.shortBreakLength]);
 
   const startNextPomodoro = useCallback(() => {
     setPomodoroPhase('work');
-    setIsRunning(false);
     const now = new Date();
     const newTarget = addMinutes(now, settings.pomodoroLength);
     setTargetDate(newTarget);
-    setTimeLeft(getTimeUnits(settings.pomodoroLength * 60 * 1000));
+    remainingMsRef.current = null;
+    setTimeLeft(getTimeUnits(settings.pomodoroLength * 60 * 1000, true));
+    // Don't set isRunning here - let the caller (auto-start logic) decide
   }, [settings.pomodoroLength]);
 
   const resumeTimer = useCallback(() => {
-    const now = new Date();
-    const timeLeftMs = targetDate ? Math.max(0, targetDate.getTime() - now.getTime()) : 0;
-    const duration = pomodoroPhase === 'work' ? settings.pomodoroLength : settings.shortBreakLength;
-    const newTarget = addMinutes(now, duration);
-    setTargetDate(newTarget);
-    setTimeLeft(getTimeUnits(duration * 60 * 1000));
+    const remaining = remainingMsRef.current;
+    if (remaining !== null && remaining > 0) {
+      // Resume from where we paused
+      const now = new Date();
+      const newTarget = new Date(now.getTime() + remaining);
+      setTargetDate(newTarget);
+      setTimeLeft(getTimeUnits(remaining, isPomodoroMode));
+    }
+    remainingMsRef.current = null;
     setIsRunning(true);
-  }, [targetDate, pomodoroPhase, settings.pomodoroLength, settings.shortBreakLength]);
+  }, [isPomodoroMode]);
 
   const skipToNextPhase = useCallback(() => {
     if (pomodoroPhase === 'work') {
       startBreak();
+      if (settings.autoStartBreaks) {
+        setIsRunning(true);
+      }
     } else {
       startNextPomodoro();
+      if (settings.autoStartPomodoros) {
+        setIsRunning(true);
+      }
     }
-  }, [pomodoroPhase, startBreak, startNextPomodoro]);
+  }, [pomodoroPhase, startBreak, startNextPomodoro, settings.autoStartBreaks, settings.autoStartPomodoros]);
 
+  // Initialize on mount
   useEffect(() => {
-    // Initialize dates after component mounts
+    mounted.current = true;
     const now = new Date();
-    const initialTimeLeftMs = DEFAULT_POMODORO_LENGTH * 60 * 1000;
     setCurrentDate(now);
+    // Start with a default 25min display (not running)
+    const initialTimeLeftMs = DEFAULT_POMODORO_LENGTH * 60 * 1000;
     const initialTarget = addMinutes(now, DEFAULT_POMODORO_LENGTH);
     setTargetDate(initialTarget);
-    setTimeLeft(getTimeUnits(initialTimeLeftMs));
+    setTimeLeft(getTimeUnits(initialTimeLeftMs, false));
+    return () => { mounted.current = false; };
   }, []);
 
+  // Update current clock display
   useIsomorphicLayoutEffect(() => {
-    // Update current time
     const timeInterval = setInterval(() => {
-      const now = new Date();
-      setCurrentDate(now);
+      setCurrentDate(new Date());
     }, 1000);
-
     return () => clearInterval(timeInterval);
   }, []);
 
+  // Main countdown interval
   useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!mounted.current) return;
-
-    if (!isRunning || !mounted.current || !targetDate) {
-      return;
-    }
+    if (!isRunning || !targetDate) return;
 
     const interval = setInterval(() => {
       const now = new Date();
       const timeLeftMs = Math.max(0, targetDate.getTime() - now.getTime());
-      
+
       if (!isPomodoroMode) {
         setUrgencyLevel(getUrgencyLevel(timeLeftMs));
       }
-      
-      const newTimeUnits = getTimeUnits(timeLeftMs);
-      setTimeLeft(newTimeUnits);
 
-      if (timeLeftMs === 0) {
+      setTimeLeft(getTimeUnits(timeLeftMs, isPomodoroMode));
+
+      if (timeLeftMs <= 0) {
         clearInterval(interval);
         setIsRunning(false);
+        remainingMsRef.current = null;
         playCompletionSound();
 
         if (isPomodoroMode) {
@@ -215,13 +215,13 @@ const CountdownTimer = () => {
             setTimeout(() => setShowWorkEndCue(false), 1000);
             const newCount = pomodoroCount + 1;
             setPomodoroCount(newCount);
-            
+
             if (newCount >= settings.targetPomodoroCount) {
               stopPomodoro();
               setCurrentTask('');
               return;
             }
-            
+
             startBreak();
             if (settings.autoStartBreaks) {
               setIsRunning(true);
@@ -229,7 +229,6 @@ const CountdownTimer = () => {
           } else {
             setShowBreakEndCue(true);
             setTimeout(() => setShowBreakEndCue(false), 1000);
-            
             startNextPomodoro();
             if (settings.autoStartPomodoros) {
               setIsRunning(true);
@@ -240,7 +239,7 @@ const CountdownTimer = () => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [targetDate, isRunning, isPomodoroMode, pomodoroPhase, settings.autoStartPomodoros, settings.targetPomodoroCount, pomodoroCount, startBreak, startPomodoro, playCompletionSound, stopPomodoro, settings.autoStartBreaks, initializePomodoro]);
+  }, [targetDate, isRunning, isPomodoroMode, pomodoroPhase, settings.autoStartPomodoros, settings.targetPomodoroCount, pomodoroCount, startBreak, startNextPomodoro, playCompletionSound, stopPomodoro, settings.autoStartBreaks]);
 
   return (
     <div className={cn(
@@ -314,7 +313,7 @@ const CountdownTimer = () => {
                   <Input
                     id="work-duration"
                     type="number"
-                    min="1" 
+                    min="1"
                     max="1440"
                     value={settings.pomodoroLength}
                     onChange={(e) => setSettings({
@@ -360,7 +359,7 @@ const CountdownTimer = () => {
                 checked={use24HourTime}
                 onCheckedChange={(checked) => {
                   setUse24HourTime(checked);
-                  setInputKey(prev => prev + 1); // Force input to re-render with new format
+                  setInputKey(prev => prev + 1);
                 }}
               />
             </div>
@@ -398,8 +397,8 @@ const CountdownTimer = () => {
               Name your task to help stay focused during this Pomodoro session.
             </DialogDescription>
           </DialogHeader>
-          <form 
-            className="grid gap-6 py-6" 
+          <form
+            className="grid gap-6 py-6"
             onSubmit={(e) => {
               e.preventDefault();
               setShowTaskDialog(false);
@@ -422,24 +421,22 @@ const CountdownTimer = () => {
               autoFocus
             />
             <div className="flex flex-col sm:flex-row justify-end gap-3">
-              <Button 
+              <Button
                 type="button"
-                variant="ghost" 
+                variant="ghost"
                 className="h-12 text-base w-full sm:w-auto order-2 sm:order-1"
                 onClick={() => {
-                setShowTaskDialog(false);
-                setCurrentTask('');
-              }}>
+                  setShowTaskDialog(false);
+                  setCurrentTask('');
+                }}
+              >
                 <XCircle className="w-4 h-4 mr-2" />
                 Cancel
               </Button>
               <Button
                 type="submit"
                 className="h-12 text-base w-full sm:w-auto order-1 sm:order-2"
-                onClick={() => {
-                setShowTaskDialog(false);
-                initializePomodoro();
-              }}>
+              >
                 <CheckCircle2 className="w-4 h-4 mr-2" />
                 Start Pomodoro
               </Button>
@@ -477,7 +474,7 @@ const CountdownTimer = () => {
             pomodoroPhase === 'break' && isRunning && "bg-green-500/20 text-green-500",
             !isRunning && "bg-zinc-500/20 text-zinc-500"
           )}>
-            {!isRunning ? "Ready" : pomodoroPhase === 'work' ? "Work" : "Break"}
+            {!isRunning ? "Paused" : pomodoroPhase === 'work' ? "Work" : "Break"}
           </div>
           <span className="text-xs font-mono text-muted-foreground">
             {pomodoroCount + 1}/{settings.targetPomodoroCount}
@@ -487,14 +484,14 @@ const CountdownTimer = () => {
 
       <div className="flex flex-col items-center justify-center mb-4">
         <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
-        {timeLeft.map((unit, index) => (
-          <FlipDigit
-            key={unit.label}
-            digit={unit.value}
-            unit={unit.label}
-            visible={(unit.label !== 'seconds' || showSeconds) && unit.show}
-          />
-        ))}
+          {timeLeft.map((unit) => (
+            <FlipDigit
+              key={unit.label}
+              digit={unit.value}
+              unit={unit.label}
+              visible={(unit.label !== 'seconds' || showSeconds) && unit.show}
+            />
+          ))}
         </div>
       </div>
 
@@ -510,7 +507,6 @@ const CountdownTimer = () => {
       )}
 
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 w-full max-w-md">
-        {/* Primary Action Button */}
         {isPomodoroMode ? (
           isRunning ? (
             <Button
@@ -548,40 +544,47 @@ const CountdownTimer = () => {
           </Button>
         )}
 
-        {/* Skip Button - Only show when paused in Pomodoro mode */}
         {isPomodoroMode && !isRunning && (
           <Button
             variant="outline"
             className="h-12 sm:h-10 text-base sm:text-sm"
             onClick={skipToNextPhase}
           >
+            <SkipForward className="w-4 h-4 mr-2" />
             Skip to {pomodoroPhase === 'work' ? 'Break' : 'Work'}
           </Button>
         )}
 
-        {/* Stop/Reset Button - Only show in Pomodoro mode */}
         {isPomodoroMode && (
           <Button
             variant="outline"
             className="text-destructive hover:text-destructive h-12 sm:h-10 text-base sm:text-sm"
             onClick={stopPomodoro}
           >
+            <Square className="w-4 h-4 mr-2" />
             Stop Session
           </Button>
         )}
 
-        {/* Target Time Mode Button */}
-        <Button
-          variant={!isPomodoroMode ? "secondary" : "outline"}
-          className="h-12 sm:h-10 text-base sm:text-sm"
-          onClick={() => setIsPomodoroMode(false)}
-        >
-          <Clock className="w-4 h-4 mr-2" />
-          Target Time
-        </Button>
+        {!isPomodoroMode && (
+          <Button
+            variant="secondary"
+            className="h-12 sm:h-10 text-base sm:text-sm"
+            onClick={() => {
+              if (isRunning) {
+                setIsRunning(false);
+                remainingMsRef.current = null;
+              }
+            }}
+            disabled={!isRunning}
+          >
+            <Clock className="w-4 h-4 mr-2" />
+            {isRunning ? 'Stop Countdown' : 'Set Target Below'}
+          </Button>
+        )}
       </div>
 
-      <div className={cn("w-full max-w-xs mx-auto transition-all duration-300", isPomodoroMode ? "opacity-0 invisible" : "opacity-100 visible")}>
+      <div className={cn("w-full max-w-xs mx-auto transition-all duration-300", isPomodoroMode ? "opacity-0 invisible h-0" : "opacity-100 visible")}>
         <Input
           id="datetime-input"
           key={inputKey}
@@ -591,14 +594,19 @@ const CountdownTimer = () => {
             const newDate = new Date(e.target.value);
             if (!isNaN(newDate.getTime())) {
               const timeLeftMs = differenceInMilliseconds(newDate, new Date());
-              setUrgencyLevel(getUrgencyLevel(timeLeftMs));
-              setTargetDate(newDate);
-              setTimeLeft(getTimeUnits(timeLeftMs));
+              if (timeLeftMs > 0) {
+                setUrgencyLevel(getUrgencyLevel(timeLeftMs));
+                setTargetDate(newDate);
+                setTimeLeft(getTimeUnits(timeLeftMs, false));
+                setIsPomodoroMode(false);
+                remainingMsRef.current = null;
+                // Actually start the countdown!
+                setIsRunning(true);
+              }
             }
-            setIsPomodoroMode(false);
           }}
           className="w-full text-base sm:text-sm h-12 sm:h-10 px-4 py-2 bg-background border rounded-md"
-          value={targetDate ? format(targetDate, "yyyy-MM-dd'T'HH:mm") : ''}
+          value={targetDate && !isPomodoroMode ? format(targetDate, "yyyy-MM-dd'T'HH:mm") : ''}
         />
         <div className="text-sm text-muted-foreground mt-2 text-center w-full">
           Current Time: {currentDate ? format(currentDate, use24HourTime ? 'yyyy/MM/dd HH:mm:ss' : 'yyyy/MM/dd hh:mm:ss a') : ''}
